@@ -1,2 +1,3 @@
 # claude-code-skills
-A repository containing all my custom skills and mcp servers for claude code.
+
+A repository containing all my custom skills, mcp servers and other tweaks for Claude Code.
