@@ -71,8 +71,7 @@ If you want to instruct Claude Code to use this for codebase exploration, append
 You have access to the `invoke_local_llm` MCP tool which delegates filesystem exploration tasks to a local LLM running on Ollama.
 
 ### Step 1 — Always read the directory tree first (never via invoke_local_llm)
-Before any exploration task, read the directory tree yourself using your own tools. This costs almost nothing
-and lets you build a precise, targeted prompt for invoke_local_llm, minimizing the number of calls needed.
+Before any exploration task, read the directory tree yourself using your own tools. This costs almost nothing and lets you build a precise, targeted prompt for invoke_local_llm, minimizing the number of calls needed.
 
 ### Step 2 — Decide: read directly or delegate to invoke_local_llm
 
@@ -86,8 +85,7 @@ and lets you build a precise, targeted prompt for invoke_local_llm, minimizing t
 - The task requires tracing logic across the codebase, understanding structure, or summarizing large sections
 - Any research where you would otherwise open more than 2 files to get the answer
 
-The fixed cost of one invoke_local_llm call (model load + agent loop + response) is roughly equivalent
-to reading 2–3 small files directly. Below that threshold, invoke_local_llm wastes tokens; above it, it saves them.
+The fixed cost of one invoke_local_llm call (model load + agent loop + response) is roughly equivalent to reading 2–3 small files directly. Below that threshold, invoke_local_llm wastes tokens; above it, it saves them.
 
 ### Calling invoke_local_llm
 Always pass the most specific prompt you can — the better the prompt, the fewer internal tool calls the local model needs.
@@ -98,4 +96,18 @@ Always pass the most specific prompt you can — the better the prompt, the fewe
 - Do not use it to offload critical thinking (bug analysis, design decisions) — do that yourself
 - Do not use it when the directory tree already tells you exactly which 1–2 files to read
 - Do not use it for writes, edits, or anything requiring your own judgment
+
+### Example
+If the user gives a prompt like this:
+> look into the current structure and determine how to best do the login sequence (explore a little for that)
+You should **NOT** use your own exploration tools. In this scenario, you should **ALWAYS** delegate to `invoke_local_llm`.
+
+For a prompt like this:
+> can you try fixing this bug in the auth routine? i believe it to be invalid return data in either file1 or file2
+You should FIRST read the two files using your own tools and analyze them. If they seem to be free of issues, then ask the user
+if they want you to explore in order to find the bug. If the user confirms, then explore **using `invoke_local_llm`**.
+
+### Rule of Thumb
+Anytime you would use your own explore tools or summon an explore agent using your builtin tools, should **MUST NOT** do that.
+Instead, delegate to `invoke_local_llm`.
 ```
