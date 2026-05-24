@@ -34,6 +34,9 @@ Here's what each one means:
 - `LAYERS_ON_GPU`: How many layers of the LLM to run on the GPU (to run all, use a very large number like 9999)
 - `CONTEXT_WINDOW`: Size of the LLM's context window (how much information it can "hold")
 
+> **Important:** If you choose a too powerful model or try to put too much load onto the gpu,
+> ollama may silently block execution (infinite wait loop).
+
 
 
 ## Installation
