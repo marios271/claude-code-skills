@@ -91,12 +91,18 @@ TOOLS = [
 
 
 # agent loop
-async def run_agent(prompt: str, allowed_dirs: list[str], max_steps: int = 30) -> str:
+async def run_agent(prompt: str, allowed_dirs: list[str]) -> str:
     system = (
-        "You are an assistant for another AI agent. "
-        "You have access to list_dir and read_file tools. "
-        "Use them to answer the user's question thoroughly. "
-        "When you have enough information, stop calling tools and give a clear, concise summary. "
+        "You are a code-reading agent working on behalf of another AI. "
+        "Your ONLY job is to collect raw facts from the codebase using list_dir and read_file. "
+        "Do NOT reason about design, make recommendations, or explain tradeoffs — the calling agent handles that. "
+        "Do NOT infer or assume anything you have not read directly from a file. "
+        "If a file does not exist or is empty, say so explicitly. "
+        "For every fact you report, include the exact file path and line number. "
+        "Report findings as a structured list of facts. No prose summaries, no suggestions. "
+        "Read every file the prompt asks for before responding — do not stop early. "
+        "Once you have read all relevant files, your final message MUST be a structured summary of all facts collected. "
+        "Do not make any more tool calls after the summary — just return the summary as plain text. "
         f"You may only access these directories: {', '.join(allowed_dirs)}"
     )
 
@@ -108,8 +114,9 @@ async def run_agent(prompt: str, allowed_dirs: list[str], max_steps: int = 30) -
     msg: dict = {"content": "No steps were executed."}
 
     loop = asyncio.get_event_loop()
+    step = 0
 
-    for step in range(max_steps):
+    while True:
         msgs_snapshot = list(messages)
 
         response = await loop.run_in_executor(
@@ -135,10 +142,18 @@ async def run_agent(prompt: str, allowed_dirs: list[str], max_steps: int = 30) -
             f"[ollama-mcp] step={step} tool_calls={[c['function']['name'] for c in tool_calls]}",
             file=sys.stderr,
         )
+        step += 1
 
         # model is done, return its final answer
         if not tool_calls:
-            return msg.get("content") or "No response from model."
+            content = msg.get("content")
+            if content:
+                return content
+            # Model stopped without a text reply, return last tool results as fallback
+            tool_results = [m["content"] for m in messages if m.get("role") == "tool"]
+            if tool_results:
+                return "Model returned no summary. Raw tool results:\n\n" + "\n---\n".join(tool_results[-10:])
+            return "No response from model."
 
         # execute each tool call and feed results back
         for call in tool_calls:
@@ -167,10 +182,6 @@ async def run_agent(prompt: str, allowed_dirs: list[str], max_steps: int = 30) -
                 "content": result,
             })
 
-    # Reached step limit
-    partial = msg.get("content") or ""
-    return f"Reached maximum exploration steps ({max_steps}). Partial findings:\n{partial}"
-
 
 # mcp tool for claude code
 @app.list_tools()
@@ -196,11 +207,6 @@ async def list_tools() -> list[types.Tool]:
                         "items": {"type": "string"},
                         "description": "Absolute directory paths the local model may access",
                     },
-                    "max_steps": {
-                        "type": "integer",
-                        "description": "Max tool-call iterations. Default: 30.",
-                        "default": 30,
-                    },
                 },
                 "required": ["prompt", "allowed_dirs"],
             },
@@ -215,9 +221,8 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 
     prompt: str = arguments["prompt"]
     allowed_dirs: list[str] = arguments["allowed_dirs"]
-    max_steps: int = arguments.get("max_steps", 30)
 
-    result = await run_agent(prompt, allowed_dirs, max_steps)
+    result = await run_agent(prompt, allowed_dirs)
     return [types.TextContent(type="text", text=result)]
 
 
