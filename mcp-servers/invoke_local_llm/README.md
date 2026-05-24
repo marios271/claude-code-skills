@@ -8,6 +8,7 @@ multi-file exploration tasks to a locally running LLM , which saves Claude Code 
 > with no changes, but has not been tested there.
 
 
+
 ## Prerequisites
 
 - [Ollama](https://ollama.com) installed and running
@@ -15,35 +16,24 @@ multi-file exploration tasks to a locally running LLM , which saves Claude Code 
 - Python 3.10+
 
 
-## Model Setup
 
-First, pull the model of your choice (here using `qwen2.5:14b`):
+## Configuring the local LLM
 
-```bash
-ollama pull qwen2.5:14b
+In `main.py`, there are four fields:
+
+```python
+MODEL_TO_USE = "qwen2.5:7b"
+KEEP_ALIVE_TIMEOUT = "30s"
+LAYERS_ON_GPU = 9999
+CONTEXT_WINDOW = 32768
 ```
 
-Then, create the optimized local model.
-Create a file called `Modelfile` and set your preferences there:
+Here's what each one means:
+- `MODEL_TO_USE`: The model to use. Pick it out at the ollama registry and pull it using `ollama pull <model-name>`
+- `KEEP_ALIVE_TIMEOUT`: How long after the model is finished to wait before unloading it. Keep this over at least ~20s, as in between tool calls the model is idle. Example: keep alive is 5s, the tool call takes 10s, the model unloads before the tool call finished and the model has to be loaded again.
+- `LAYERS_ON_GPU`: How many layers of the LLM to run on the GPU (to run all, use a very large number like 9999)
+- `CONTEXT_WINDOW`: Size of the LLM's context window (how much information it can "hold")
 
-```
-FROM qwen2.5:14b           # Which model to use (e.g. gemma4:e4b, qwen2.5:14b, ...)
-PARAMETER num_gpu 40       # How many layers of the LLM to load into VRAM rather than RAM
-PARAMETER num_ctx 32768    # The context window (here: 32k)
-```
-
-After, run this command to register the model with ollama:
-
-```bash
-ollama create qwen14b-explorer -f Modelfile
-```
-
-You can use whatever name you want here. Make sure to also set the exact same name in `main.py` later.
-At the end, `Modelfile` can be deleted.
-
-
-> `num_gpu 40` and `num_ctx 32768` are tuned for an RTX 4050 laptop (6GB VRAM) with RAM spillover.
-> Adjust them based on your GPU. Run `ollama ps` after a call to verify VRAM usage.
 
 
 ## Installation
@@ -60,6 +50,7 @@ Register the MCP server with Claude Code:
 ```bash
 claude mcp add ollama-explorer --transport stdio --scope user -- python ~/.claude/mcp-servers/ollama-explorer/mcp_explorer.py
 ```
+
 
 
 ## Additional Resources
